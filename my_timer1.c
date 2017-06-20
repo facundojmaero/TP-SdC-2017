@@ -158,7 +158,7 @@ static ssize_t device_write(struct file *filp, const char *buff, size_t len, lof
 	copy_from_user (msg, buff, len);
     //Hago que el puntero apunte al mensaje para cuando lo lea
 	msg_Ptr = msg;
-	printk(KERN_ALERT "Mensaje recibido -> %s\n", msg);
+	printk(KERN_ALERT "Mensaje recibido -> %s", msg);
 
 	res = kstrtol(msg, 10, &timer_value);
 	if(res){
@@ -167,8 +167,5 @@ static ssize_t device_write(struct file *filp, const char *buff, size_t len, lof
 	}
 	
 	my_timer_startup(timer_value);	
-
-	printk("Conversion -> %lu\n", timer_value);
-
 	return 0;
 }

@@ -10,21 +10,129 @@
 #define MAX_VALUE 1000000000
 #define NEGATIVE_NUMBER -1
 #define NUMBER_TOO_BIG -2
-
-char stringToSend[STRING_LEN];
-char recieve[STRING_LEN];
+#define POLLING_INTERVAL 500000
+#define OFFSET 50000
 
 int check_input(int number);
 void print_header1(void);
 void print_header2(void);
+int get_mode(void);
+int get_time(void);
+int read_polling(int fd);
+int read_sleep(int fd, int time_to_sleep);
 
 int main(){
 
-	int result, mode;
-	char mode_str[STRING_LEN];
+	int time_to_sleep, mode, ret, fd;
+	char time_to_sleep_str[STRING_LEN];
 
 	print_header1();
 
+	mode = get_mode();
+	if(mode == -1){
+		exit(EXIT_FAILURE);
+	}
+
+	print_header2();
+
+	time_to_sleep = get_time();
+	if(time_to_sleep == -1){
+		exit(EXIT_FAILURE);
+	}
+
+	sprintf(time_to_sleep_str, "%d\n", time_to_sleep);
+
+	fd = open("/dev/my_timer1", O_RDWR);
+	if (fd < 0){
+		perror("Error al abrir el Encryptor...");
+		return errno;
+	}
+
+	ret = write(fd, time_to_sleep_str, strlen(time_to_sleep_str));
+	if (ret < 0){
+		perror("Error al escribir el archivo del modulo.");
+		return errno;
+	}
+
+	switch(mode) {
+		case 1  :
+			ret = read_polling(fd);
+			break;
+
+		case 2 :
+			ret = read_sleep(fd, time_to_sleep);
+			break;
+
+		case 3 :
+			break;
+
+		default :
+			break;
+	}
+
+	if(ret != 0){
+		printf("Error en lectura de file descriptor\n");
+		exit(EXIT_FAILURE);
+	}
+
+	close(fd);
+	return 0;
+}
+
+int read_polling(int fd){
+	int ret;
+	char recieve[STRING_LEN];
+
+	while(1){
+		ret = read(fd, recieve, STRING_LEN);
+		if (ret < 0){
+			perror("Error al leer la respuesta del modulo.");
+			return errno;
+		}
+
+		printf(".");
+		fflush(stdout);
+		if(strcmp(recieve, "Not yet...") != 0){
+			printf("\n");
+			break;
+		}
+
+		usleep(POLLING_INTERVAL);
+	}
+
+	printf("Timer finalizado, mensaje recibido: %s", recieve);
+	return 0;
+}
+
+int read_sleep(int fd, int time_to_sleep){
+	int ret;
+	char recieve[STRING_LEN];
+
+	usleep(time_to_sleep * 1000 + OFFSET);
+	
+	ret = read(fd, recieve, STRING_LEN);
+	if (ret < 0){
+		perror("Error al leer la respuesta del modulo.");
+		return errno;
+	}
+
+	printf("Timer finalizado, mensaje recibido: %s", recieve);
+	return 0;	
+}
+
+void print_header1(void){
+	printf("Trabajo Practico de Sistemas de Computacion\n");
+	printf("Ingrese el metodo deseado:\n");
+	printf(	"1 -> Polling\n"
+			"2 -> Sleep\n"
+			"3 -> Interrupcion\n");
+}
+
+int get_mode(void){
+
+	char mode_str[STRING_LEN];
+	int mode;
+	
 	if( scanf("%s", mode_str) < 0){
 		perror("Error al leer el mensaje\n");
 		exit(EXIT_FAILURE);
@@ -47,17 +155,22 @@ int main(){
 
 		default :
 			printf("Modo incorrecto\n");
+			return -1;
 	}
+	return mode;
+}
 
-	print_header2();
+int get_time(void){
 
+	char time_to_sleep_str[STRING_LEN];
+	int result;
 
-	if( scanf("%s", stringToSend) < 0){
+	if( scanf("%s", time_to_sleep_str) < 0){
 		perror("Error al leer el mensaje\n");
 		exit(EXIT_FAILURE);
 	}
 
-	result = atoi(stringToSend);
+	result = atoi(time_to_sleep_str);
 
 	switch(check_input(result)) {
 
@@ -71,53 +184,9 @@ int main(){
 
 		default :
 		printf("Tiempo ingresado: %d ms\n", result);
+		return result;
 	}
-
-	sprintf(stringToSend, "%d\n", result);
-
-	int ret;
-	int fdEnc = open("/dev/my_timer1", O_RDWR);             // Abro el archivo con permisos de lectoescritura
-	if (fdEnc < 0){
-		perror("Error al abrir el Encryptor...");
-		return errno;
-	}
-
-	ret = write(fdEnc, stringToSend, strlen(stringToSend)); // Envio el string al encriptador escribiendo en el archivo dev
-	if (ret < 0){
-		perror("Error al escribir el archivo del modulo.");
-		return errno;
-	}
-
-	while(1)
-	{
-		ret = read(fdEnc, recieve, 100);        // Leo la respuesta del modulo
-		if (ret < 0){
-			perror("Error al leer la respuesta del modulo.");
-			return errno;
-		}
-
-		printf(".");
-		fflush(stdout);
-		if(strcmp(recieve, "Not yet...") != 0){
-			printf("\n");
-			break;
-		}
-
-		usleep(500000);
-	}
-
-	printf("Timer finalizado, mensaje recibido: %s ms\n", recieve);
-
-	close(fdEnc);
-	return 0;
-}
-
-void print_header1(void){
-	printf("Trabajo Practico de Sistemas de Computacion\n");
-	printf("Ingrese el metodo deseado:\n");
-	printf(	"1 -> Polling\n"
-			"2 -> Sleep\n"
-			"3 -> Interrupcion\n");
+	return -1;
 }
 
 void print_header2(void){
