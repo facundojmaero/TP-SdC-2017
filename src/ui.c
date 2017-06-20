@@ -21,10 +21,21 @@ int get_time(void);
 int read_polling(int fd);
 int read_sleep(int fd, int time_to_sleep);
 
+void open_driver(int* fd){
+	*fd = open("/dev/my_timer1", O_RDWR);
+	if (*fd < 0){
+		perror("Error al abrir el driver");
+		exit(EXIT_FAILURE);
+	}
+}
+
 int main(){
 
-	int time_to_sleep, mode, ret, fd;
+	int time_to_sleep, mode, ret;
 	char time_to_sleep_str[STRING_LEN];
+
+	int fd;
+	open_driver(&fd);
 
 	print_header1();
 
@@ -41,12 +52,6 @@ int main(){
 	}
 
 	sprintf(time_to_sleep_str, "%d\n", time_to_sleep);
-
-	fd = open("/dev/my_timer1", O_RDWR);
-	if (fd < 0){
-		perror("Error al abrir el Encryptor...");
-		return errno;
-	}
 
 	ret = write(fd, time_to_sleep_str, strlen(time_to_sleep_str));
 	if (ret < 0){
@@ -151,6 +156,8 @@ int get_mode(void){
 
 		case 3 :
 			printf("Uso Interrupcion\n");
+			printf("To do\n");
+			exit(EXIT_SUCCESS);
 			break;
 
 		default :
