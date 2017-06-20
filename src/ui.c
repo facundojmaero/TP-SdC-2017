@@ -20,14 +20,7 @@ int get_mode(void);
 int get_time(void);
 int read_polling(int fd);
 int read_sleep(int fd, int time_to_sleep);
-
-void open_driver(int* fd){
-	*fd = open("/dev/my_timer1", O_RDWR);
-	if (*fd < 0){
-		perror("Error al abrir el driver");
-		exit(EXIT_FAILURE);
-	}
-}
+void open_driver(int* fd);
 
 int main(){
 
@@ -206,4 +199,12 @@ int check_input(int number){
 	if (number > MAX_VALUE)
 		return NUMBER_TOO_BIG;
 	return 0;
+}
+
+void open_driver(int* fd){
+	*fd = open("/dev/my_timer1", O_RDWR);
+	if (*fd < 0){
+		perror("Error al abrir el driver");
+		exit(EXIT_FAILURE);
+	}
 }
