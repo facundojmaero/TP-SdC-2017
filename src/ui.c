@@ -1,3 +1,15 @@
+/** @file ui.c
+ *  @brief Interfaz de usuario.
+ *
+ *  This file contains the main() function of the UI.
+ *
+ * 
+ *  @author Facundo Maero
+ *  @author Agustin Colazo
+ *  @author Gustavo Gonzalez
+ *  @bug No known bugs.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
