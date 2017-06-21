@@ -5,7 +5,7 @@ ___
 |------------------------------------|
 |Maero Facundo - 38479441              |
 |Colazo Agustín - 38986764		|
-|Gonzalez Gustavo - 			|
+|Gonzalez Gustavo - 7721064		|
 
 - [Trabajo Práctico - Sistemas de Computación](#trabajo-práctico---sistemas-de-computación)
   * [Consignas del Trabajo](#consignas-del-trabajo)
@@ -24,9 +24,12 @@ ___
       - [API de Timers de Linux](#api-de-timers-de-linux)
       - [Apertura y Cierre del Device](#apertura-y-cierre-del-device)
       - [Lectura y Escritura del Device](#lectura-y-escritura-del-device)
+      - [Interrupciones y Procesos Bloqueados](#interrupciones-y-procesos-bloqueados)
     + [Desarrollo de la Interfaz de Usuario](#desarrollo-de-la-interfaz-de-usuario)
     + [Makefile y uso](#makefile-y-uso)
+    + [Bibliografía](#bibliografía)
   * [CppCheck](#cppcheck)
+
 
 ## Consignas del Trabajo
 ---
@@ -80,7 +83,7 @@ Veremos que hay varios archivos más en la carpeta. El que nos interesa es
 
 Para instalarlo en el kernel solo debemos ejecutar `sudo insmod hello-1.ko`. Asimismo, para eliminarlo se usa `sudo rmmod hello-1`.
 
-Este simple driver imprime en los logs del kernel un mensaje al instalarlo, y uno al eliminarlo. Estos pueden verse ejecutando el comando `dmesg`, que muestra por la terminal todo el log del kernel desde que se encendió la PC.
+Este simple driver imprime en los logs del kernel un mensaje al instalarlo, y uno al eliminarlo. Estos pueden verse ejecutando el comando `dmesg -wH`, que muestra por la terminal todo el log del kernel desde que se encendió la PC, en formato legible para el usuario, y de manera continua para ver los cambios en el log.
 
 ### Conceptos Útiles
 
@@ -136,7 +139,7 @@ my_cdev->owner = THIS_MODULE;
 ```
 
 #### Reservar y desalojar Device Numbers
-Un driver es solicitar un major y minor number al sistema. Esto puede realizarse de manera estática (solicitando un major puntual), o dinámica (su major es asignado por el Sistema Operativo, con un número libre). 
+Un driver debe solicitar un major y minor number al sistema. Esto puede realizarse de manera estática (solicitando un major puntual), o dinámica (su major es asignado por el Sistema Operativo, con un número libre). 
 Se prefiere la segunda metodología.
 
 Una vez listo el paso anterior, se solicita al Kernel que nos asigne un major number:
@@ -223,7 +226,7 @@ La variable `long timer_value` guarda el tiempo a pasar al timer. Se extrae esta
 copy_from_user (msg, buff, len);
 msg_Ptr = msg;
 
-res = kstrtol(msg, 10, &timer_value);
+res = simple_strtol(msg, 10, &timer_value);
 if(res){
 	printk("my_timer1 -> parsing error\n");
 	return res;
@@ -238,6 +241,33 @@ error_count = copy_to_user(buffer, msg, length);
 return error_count;
 ```
 Se copia al string de usuario `buffer` el contenido de `msg`, y se retorna `error_count`. En caso exitoso su valor será cero.
+
+#### Interrupciones y Procesos Bloqueados
+
+El callback del timer de Linux se ejecuta en contexto de interrupción, por lo que no puede incluir funciones como sleep o relacionadas.
+
+Esto puede comprobarse de manera simple con la función `in_interrupt()`, incluída en la librería `<asm/hardirq.h>`
+Esta función permite saber si un bloque de código del Kernel se encuentra ejecutándose en contexto de interrupción.
+
+Por lo tanto, nuestro `my_timer_callback` se está ejecutando en contexto de interrupción, lo cual es muy útil para avisar a procesos relacionados sobre la ocurrencia de un evento.
+
+Utilizaremos una estructura del Kernel, llamada **Wait Queue**, que consiste en una lista de procesos que esperan un evento. Se la declara de manera estática con la macro:
+```
+DECLARE_WAIT_QUEUE_HEAD(wq);
+```
+
+Luego, para incorporar la versión interrumpible a nuestro driver, agregamos la siguiente función, que agrega el proceso actual a la wait queue `wq` hasta que sea despertado. 
+```
+wait_event_interruptible(wq, timer_done != 0);
+```
+El segundo argumento es una condición, una expresión booleana evaluada antes y después de dormir. Hasta que no evalúe a `True`, el proceso seguirá durmiendo.
+
+Como se explicó anteriormente, se aprovechará la naturaleza de la ejecución de `my_timer_callback()` para despertar al proceso esperando. Esto se realiza explícitamente con la función:
+```
+wake_up_interruptible(&wq);
+```
+
+Así, el proceso bloqueado en la mitad de la ejecución de una función del driver continuará directamente donde fue bloqueado sin ningún problema.
 
 ### Desarrollo de la Interfaz de Usuario
 El programa que actúa como User Interface consiste en un código en C que solicita un valor a pasarle al driver, lo controla, y muestra por consola los resultados arrojados.
@@ -259,16 +289,16 @@ Se incorporaron 3 modalidades:
  ![ui sleep](/screens/ui_sleep.png?raw=true)
  ![dmesg sleep](/screens/dmesg_sleep.png?raw=true)
  
- - **Interrupción:**
+ - **Interrupción:** El proceso lee el driver, se bloquea y espera ser despertado cuando el timer finalice.
  
  En los primeros dos escenarios el proceso duerme utilizando la función `usleep()`, que acepta valores en microsegundos, por lo que las constantes definidas se encuentran en esta unidad.
  Una vez seleccionado esto, se solicita el tiempo para configurar el timer. Se aceptan valores positivos, pudiendo configurar un valor máximo `MAX_VALUE`.
 
-Cuando ya se tiene el número deseado, se lo traslada a una variable string, agregándole un caracter `\n` al final, como lo indica la documentación de `kstrtol()`, y se lo envía al driver con:
+Cuando ya se tiene el número deseado, se lo traslada a una variable string, agregándole un caracter `\n` al final, como lo indica la documentación de `simple_strtol()`, y se lo envía al driver con:
 ```
 write (fd, time_to_sleep_str, strlen(time_to_sleep_str));
 ```
-La lectura se realiza con la función `read` para los primeros dos modos de operación.`
+La lectura se realiza con la función `read`:
 ```
 ret = read(fd, recieve, STRING_LEN);
 ```
@@ -287,6 +317,13 @@ Para ejecutar el proyecto se debe:
  - Ejecutar el programa
 	 - `$ ./ui`
 
+### Bibliografía
+El trabajo se realizó consultando las siguientes fuentes:
+
+ - https://www.ibm.com/developerworks/library/l-timers-list/
+ - https://technologyasilearn.wordpress.com/2015/08/30/demystifying-linux-kernel-timers/
+ - [Linux Device Drivers, Alessandro Rubini. 3ra Edición](http://shop.oreilly.com/product/9780596005900.do)
+
 ## CppCheck
 --- 
 Al compilar y linkear, se genera un archivo donde se guardan los posibles errores y advertencias que encuentre el programa CppCheck al realizar el análisis estático del código. Este archivo se encuentra en:
@@ -294,4 +331,5 @@ Al compilar y linkear, se genera un archivo donde se guardan los posibles errore
 TP-ScC-2017/src/err.txt
 ```
 Si desea más información, remítase a la documentación proporcionada, que se encuentra en la ruta ```doc/html/index.html```
+
 
