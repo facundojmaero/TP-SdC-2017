@@ -150,7 +150,7 @@ Donde se pasa como argumento la estructura de tipo `my_dev_t` que alojará los n
 
 Ahora es posible ver los números de nuestro dispositivo con las macros ``` MAJOR(my_dev_t)``` y ```MINOR(my_dev_t)```.
 
-![install](/screens/install.png?raw=true)
+![install](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/install.png?raw=true)
 
 #### Device Registration
 
@@ -171,9 +171,9 @@ Se las registra así, donde CLASS_NAME es una macro con el nombre de nuestro dri
 myCharClass = class_create(THIS_MODULE, CLASS_NAME);
 myCharDevice = device_create(myCharClass, NULL, my_dev_t, NULL, DEVICE_NAME);
 ```
-![/proc/devices](/screens/proc-devices.png?raw=true)
+![/proc/devices](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/proc-devices.png?raw=true)
 
-![ls -l /dev](/screens/ls-l-dev.png?raw=true)
+![ls -l /dev](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/ls-l-dev.png?raw=true)
 
 #### Device cleanup
 Para limpiar el driver de nuestro sistema, es decir realizar una desinstalación correcta, es necesario deshacer todos los pasos que se siguieron al instalarlo. Esto engloba desalojar los major y minor solicitados, eliminar la estructura `cdev`, desregistrar el device y su clase, y borrar las estructuras correspondientes: 
@@ -281,18 +281,18 @@ Se incorporaron 3 modalidades:
 
  -  **Polling:** intenta leer el driver cada 500 ms hasta que el timer haya finalizado, pudiendo configurarlo con `POLLING_INTERVAL`.
  
- ![ui polling](/screens/ui_polling.png?raw=true)
- ![dmesg polling](/screens/dmesg_polling.png?raw=true)
+ ![ui polling](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/ui_polling.png?raw=true)
+ ![dmesg polling](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/dmesg_polling.png?raw=true)
  
  - **Sleep:** el proceso de usuario duerme la cantidad de tiempo ingresada, y luego intenta leer el driver.
  
- ![ui sleep](/screens/ui_sleep.png?raw=true)
- ![dmesg sleep](/screens/dmesg_sleep.png?raw=true)
+ ![ui sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/ui_sleep.png?raw=true)
+ ![dmesg sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/dmesg_sleep.png?raw=true)
  
  - **Interrupción:** El proceso lee el driver, se bloquea y espera ser despertado cuando el timer finalice.
  
- ![ui sleep](/screens/ui_interrupcion.png?raw=true)
- ![dmesg sleep](/screens/dmesg_interrupcion.png?raw=true) 
+ ![ui sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/ui_interrupcion.png?raw=true)
+ ![dmesg sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/dmesg_interrupcion.png?raw=true) 
 
  En los primeros dos escenarios el proceso duerme utilizando la función `usleep()`, que acepta valores en microsegundos, por lo que las constantes definidas se encuentran en esta unidad.
  Una vez seleccionado esto, se solicita el tiempo para configurar el timer. Se aceptan valores positivos, pudiendo configurar un valor máximo `MAX_VALUE`.
