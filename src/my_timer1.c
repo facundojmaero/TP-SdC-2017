@@ -19,6 +19,7 @@
 #include <linux/device.h>
 #include <linux/cdev.h>
 #include <linux/string.h>
+#include <linux/wait.h>
 
 #define DEVICE_NAME "my_timer1"			//El dispositivo aparecera en /dev/my_timer1
 #define CLASS_NAME  "my_timer_class"
