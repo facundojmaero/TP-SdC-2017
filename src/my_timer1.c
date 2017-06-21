@@ -1,3 +1,15 @@
+/** @file my_timer.c
+ *  @brief Main file that initiates the linux driver module. It starts a timer after the user enters a given number. When it finishes it generates 
+ *	an interrupt to notify the user. It also contains the function that uninstalls the modulo (module_exit).
+ *
+ *  @author Facundo Maero
+ *  @author Agustin Colazo
+ *	@author Gustavo Gonzalez
+
+ *  @bug No known bugs.
+ */
+
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/timer.h>
@@ -11,6 +23,15 @@
 #define	MSG_LEN 100
 
 MODULE_LICENSE("GPL");
+
+
+/**
+    * @brief Punto de inicio del programa
+    *
+    * Se inicia al instalar/desintalar el modulo en el kernel a traves de la consola. 
+    * @see initialization_function(void)
+    * @see cleanup_function(void)
+    */
 
 //Prototipos de funciones de fops y otras
 static int device_open(struct inode *, struct file *);
@@ -29,6 +50,7 @@ static struct file_operations my_fops = {
 	.open = device_open,
 	.release = device_release
 };
+/**< Esta estructura define las funciones que va a realizar el driver. */
 
 static struct cdev *my_cdev;
 static int major, timer_done;
@@ -36,11 +58,24 @@ static char msg[MSG_LEN];
 static char *msg_Ptr;
 static dev_t my_dev_t;
 
+
+ /** @brief Se ejecutara al finalizar la cuenta del timer.
+	 *
+     * Se imprime en el log del kernel que la cuenta termino.
+     * 
+     */
+
 void my_timer_callback( unsigned long data )
 {
 	printk( "my_timer_callback called (%ld).\n", jiffies );
 	timer_done = 1;
 }
+ /** @brief Se pasa el valor que se desea que cuente el timer.
+	 *
+     * Esto se hace con la función mod_timer y un instante en el futuro, dado por el valor 
+     *	actual de jiffies más el tiempo deseado timer_value.
+     * 
+     */
 
 void my_timer_startup(long timer_value){
 	int ret;
@@ -50,6 +85,13 @@ void my_timer_startup(long timer_value){
 	timer_done = 0;
 }
 
+ /** @brief Instala el modulo.
+     *
+     * Esta funcion es la llamada cuando se instala el modulo. 
+     * La función de inicialización creará todas las estructuras de control necesarias para que el módulo funcione, 
+     * se registrará con el Sistema Operativo para ser utilizable por el usuario, iniciará el módulo de Timer y avisará 
+     * de su estado en los logs del Kernel.
+     */
 static int __init initialization_function(void)
 {
 
@@ -100,7 +142,12 @@ static int __init initialization_function(void)
 }
 module_init(initialization_function);
 
-
+ /** @brief Desinstala el modulo.
+     *
+     * Para limpiar el driver de nuestro sistema, es decir realizar una desinstalación correcta, es necesario deshacer todos los pasos
+     * que se siguieron al instalarlo. Esto engloba desalojar los major y minor solicitados, eliminar la estructura cdev, desregistrar 
+     * el device y su clase, y borrar las estructuras correspondientes:
+     */
 static void __exit cleanup_function(void)
 {
 	int ret;
@@ -132,6 +179,17 @@ static int device_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+ /** @brief Funcion read del driver.
+     *
+     *
+     *	Esta funcion envia un mensaje al espacio de usuario avisando si el timer termino o no.
+     *
+	 *
+	 * @param filp Puntero a una estructura file.
+	 * @param buff Buffer que se usa para pasar el mensaje.
+	 * @param len Longitud del buffer
+	 * @param off No se utiliza
+     */
 static ssize_t device_read(struct file *filp,
 						   char *buffer,	// buffer a llenar con datos
 						   size_t length,	// longitud del buffer
@@ -151,6 +209,21 @@ static ssize_t device_read(struct file *filp,
 	}
 }
 
+
+ /** @brief Funcion write del driver.
+     *
+     * Cuando el usuario escribe en el driver, le pasa el tiempo en milisegundos para el timer. 
+	 * Por lo tanto, se copia el contenido del buffer de usuario buff en el string msg en espacio de Kernel. 
+	 * Luego se apunta msg_Ptr, un char pointer, al mensaje, para luego devolverlo al usuario en un read().
+	 * La variable long timer_value guarda el tiempo a pasar al timer. Se extrae esta cantidad con la función kstrtol(), 
+	 * similar a atoi() en espacio de usuario. Finalmente se inicia el timer con la función wrapper my_timer_startup(), 
+	 * que simplemente llama a mod_timer().
+	 *
+	 * @param filp Puntero a una estructura file.
+	 * @param buff Buffer que contiene el numero que se le va a asignar al timer.
+	 * @param len Longitud del buffer
+	 * @param off No se utiliza
+     */
 static ssize_t device_write(struct file *filp, const char *buff, size_t len, loff_t * off)
 {
 	int res;
