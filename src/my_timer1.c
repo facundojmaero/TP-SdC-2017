@@ -1,11 +1,12 @@
 /** @file my_timer.c
- *  @brief Main file that initiates the linux driver module. It starts a timer after the user enters a given number. When it finishes it generates 
- *	an interrupt to notify the user. It also contains the function that uninstalls the modulo (module_exit).
+ *  @brief Main file that initiates the linux driver module. 
+ *  It starts a timer after the user enters a given number. When it finishes it generates 
+ *	an interrupt to notify the user. It also contains the function that uninstalls the module (module_exit).
  *
  *  @author Facundo Maero
  *  @author Agustin Colazo
  *	@author Gustavo Gonzalez
-
+ *
  *  @bug No known bugs.
  */
 
@@ -17,6 +18,7 @@
 #include <asm/uaccess.h>
 #include <linux/device.h>
 #include <linux/cdev.h>
+#include <linux/string.h>
 
 #define DEVICE_NAME "my_timer1"			//El dispositivo aparecera en /dev/my_timer1
 #define CLASS_NAME  "my_timer_class"
@@ -24,21 +26,13 @@
 
 MODULE_LICENSE("GPL");
 
-
-/**
-    * @brief Punto de inicio del programa
-    *
-    * Se inicia al instalar/desintalar el modulo en el kernel a traves de la consola. 
-    * @see initialization_function(void)
-    * @see cleanup_function(void)
-    */
-
 //Prototipos de funciones de fops y otras
 static int device_open(struct inode *, struct file *);
 static int device_release(struct inode *, struct file *);
 static ssize_t device_read(struct file *, char *, size_t, loff_t *);
 static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 static void my_timer_startup(long timer_value);
+
 
 static struct timer_list my_timer;
 static struct class*  myCharClass  = NULL;
@@ -53,39 +47,15 @@ static struct file_operations my_fops = {
 /**< Esta estructura define las funciones que va a realizar el driver. */
 
 static struct cdev *my_cdev;
-static int major, timer_done;
+static int major, timer_done, first_operation, interrupt_mode;
 static char msg[MSG_LEN];
 static char *msg_Ptr;
 static dev_t my_dev_t;
 
+//wait queue para alojar procesos bloqueados
+static DECLARE_WAIT_QUEUE_HEAD(wq);
 
- /** @brief Se ejecutara al finalizar la cuenta del timer.
-	 *
-     * Se imprime en el log del kernel que la cuenta termino.
-     * 
-     */
-
-void my_timer_callback( unsigned long data )
-{
-	printk( "my_timer_callback called (%ld).\n", jiffies );
-	timer_done = 1;
-}
- /** @brief Se pasa el valor que se desea que cuente el timer.
-	 *
-     * Esto se hace con la función mod_timer y un instante en el futuro, dado por el valor 
-     *	actual de jiffies más el tiempo deseado timer_value.
-     * 
-     */
-
-void my_timer_startup(long timer_value){
-	int ret;
-	printk( "Starting timer to fire in %lums (%ld)\n", timer_value, jiffies );
-	ret = mod_timer( &my_timer, jiffies + msecs_to_jiffies(timer_value) );
-	if (ret) printk("Error in mod_timer\n");
-	timer_done = 0;
-}
-
- /** @brief Instala el modulo.
+ /** @brief Funcion de inicializacion del modulo.
      *
      * Esta funcion es la llamada cuando se instala el modulo. 
      * La función de inicialización creará todas las estructuras de control necesarias para que el módulo funcione, 
@@ -134,6 +104,7 @@ static int __init initialization_function(void)
 		return PTR_ERR(myCharDevice);
 	}
 
+	//creo el timer
 	setup_timer( &my_timer, my_timer_callback, 0 );
 
 	printk(KERN_INFO "my_timer1: driver inicializado correctamente\n");
@@ -171,11 +142,13 @@ module_exit(cleanup_function);
 
 static int device_open(struct inode *inode, struct file *file)
 {
+	first_operation = 0;
 	return 0;
 }
 
 static int device_release(struct inode *inode, struct file *file)
 {
+	first_operation = 0;
 	return 0;
 }
 
@@ -197,9 +170,17 @@ static ssize_t device_read(struct file *filp,
 	int error_count = 0;
    	// copy_to_user has the format ( * to, *from, size) and returns 0 on success
 
+	printk("INTERRUPT MODE IN READ %d\n", interrupt_mode);
+	if(interrupt_mode){
+	   	printk(KERN_DEBUG "process %i (%s) going to sleep\n", current->pid, current->comm);
+		wait_event_interruptible(wq, timer_done != 0);
+		printk(KERN_DEBUG "awoken %i (%s)\n", current->pid, current->comm);
+	}
+
 	printk("device read! timer done -> %d\n", timer_done);
 	if(timer_done == 1){
-		error_count = copy_to_user(buffer, msg, length);
+		char done[] = "Timer ready!";
+		error_count = copy_to_user(buffer, done, length);
 		return error_count;	
 	}
 	else{
@@ -215,7 +196,7 @@ static ssize_t device_read(struct file *filp,
      * Cuando el usuario escribe en el driver, le pasa el tiempo en milisegundos para el timer. 
 	 * Por lo tanto, se copia el contenido del buffer de usuario buff en el string msg en espacio de Kernel. 
 	 * Luego se apunta msg_Ptr, un char pointer, al mensaje, para luego devolverlo al usuario en un read().
-	 * La variable long timer_value guarda el tiempo a pasar al timer. Se extrae esta cantidad con la función kstrtol(), 
+	 * La variable long timer_value guarda el tiempo a pasar al timer. Se extrae esta cantidad con la función simple_strtol(), 
 	 * similar a atoi() en espacio de usuario. Finalmente se inicia el timer con la función wrapper my_timer_startup(), 
 	 * que simplemente llama a mod_timer().
 	 *
@@ -226,19 +207,69 @@ static ssize_t device_read(struct file *filp,
      */
 static ssize_t device_write(struct file *filp, const char *buff, size_t len, loff_t * off)
 {
-	int res;
+	long mode;
 	long timer_value;
+	char* temp;
+
 	copy_from_user (msg, buff, len);
     //Hago que el puntero apunte al mensaje para cuando lo lea
+
+	if(first_operation == 0){
+		first_operation = 1;
+
+		mode = simple_strtol(msg, &temp , 10);
+		printk("mode %lu\n", mode);
+		if(mode == 3){
+			interrupt_mode = 1;
+			printk("Interrupt mode activated\n");
+		}
+		else{
+			interrupt_mode = 0;
+			printk("Interrupt mode deactivated\n");
+		}
+
+		return 0;
+	}
+
+	printk("%d\n", interrupt_mode);
+
 	msg_Ptr = msg;
 	printk(KERN_ALERT "Mensaje recibido -> %s", msg);
 
-	res = kstrtol(msg, 10, &timer_value);
-	if(res){
-		printk("my_timer1 -> parsing error\n");
-		return res;
-	}
-	
+	timer_value = simple_strtol(msg, &temp , 10);
+
 	my_timer_startup(timer_value);	
 	return 0;
+}
+
+/** @brief Se ejecutara al finalizar la cuenta del timer.
+	 *
+     * Se imprime en el log del kernel que la cuenta termino.
+     * Si un proceso estaba dormido esperando por el timer, se lo despierta.
+	 *
+*/
+void my_timer_callback( unsigned long data )
+{
+	printk( "my_timer_callback called (%ld).\n", jiffies );
+	timer_done = 1;
+	
+	if(interrupt_mode){
+		printk(KERN_DEBUG "process %i (%s) awakening the readers...\n",	current->pid, current->comm);
+		wake_up_interruptible(&wq);
+	}
+}
+
+ /** @brief Se pasa el valor que se desea que cuente el timer.
+	 *
+     * 	Esto se hace con la función mod_timer y un instante en el futuro, dado por el valor 
+     *	actual de jiffies más el tiempo deseado timer_value.
+     * 
+     * @timer_value Tiempo a setear el en el timer, en milisegundos
+*/
+void my_timer_startup(long timer_value){
+	int ret;
+	printk( "Starting timer to fire in %lums (%ld)\n", timer_value, jiffies );
+	ret = mod_timer( &my_timer, jiffies + msecs_to_jiffies(timer_value) );
+	if (ret) printk("Error in mod_timer\n");
+	timer_done = 0;
 }

@@ -10,37 +10,21 @@
  *  @bug No known bugs.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <string.h>
-#include <unistd.h>
-#include <string.h>
-
-#define STRING_LEN 100
-#define MAX_VALUE 1000000000
-#define NEGATIVE_NUMBER -1
-#define NUMBER_TOO_BIG -2
-#define POLLING_INTERVAL 500000
-#define OFFSET 50000
-
-int check_input(int number);
-void print_header1(void);
-void print_header2(void);
-int get_mode(void);
-int get_time(void);
-int read_polling(int fd);
-int read_sleep(int fd, int time_to_sleep);
-void open_driver(int* fd);
+#include "ui.h"
 
 int main(){
 
 	int time_to_sleep, mode, ret;
 	char time_to_sleep_str[STRING_LEN];
+	char mode_str[STRING_LEN];
 
 	int fd;
-	open_driver(&fd);
+	// open_driver(&fd);
+	fd = open("/dev/my_timer1", O_RDWR);
+	if (fd < 0){
+		perror("Error al abrir el driver");
+		exit(EXIT_FAILURE);
+	}
 
 	print_header1();
 
@@ -57,6 +41,13 @@ int main(){
 	}
 
 	sprintf(time_to_sleep_str, "%d\n", time_to_sleep);
+	sprintf(mode_str, "%d\n", mode);
+
+	ret = write(fd, mode_str, strlen(mode_str));
+	if (ret < 0){
+		perror("Error al escribir el archivo del modulo.");
+		return errno;
+	}
 
 	ret = write(fd, time_to_sleep_str, strlen(time_to_sleep_str));
 	if (ret < 0){
@@ -74,6 +65,7 @@ int main(){
 			break;
 
 		case 3 :
+			ret = read_interrupcion(fd);
 			break;
 
 		default :
@@ -130,6 +122,20 @@ int read_sleep(int fd, int time_to_sleep){
 	return 0;	
 }
 
+int read_interrupcion(int fd){
+	int ret;
+	char recieve[STRING_LEN];
+	
+	ret = read(fd, recieve, STRING_LEN);
+	if (ret < 0){
+		perror("Error al leer la respuesta del modulo.");
+		return errno;
+	}
+
+	printf("Timer finalizado, mensaje recibido: %s", recieve);
+	return 0;	
+}
+
 void print_header1(void){
 	printf("Trabajo Practico de Sistemas de Computacion\n");
 	printf("Ingrese el metodo deseado:\n");
@@ -161,8 +167,6 @@ int get_mode(void){
 
 		case 3 :
 			printf("Uso Interrupcion\n");
-			printf("To do\n");
-			exit(EXIT_SUCCESS);
 			break;
 
 		default :

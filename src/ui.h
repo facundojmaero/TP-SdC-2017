@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define STRING_LEN 100
-#define MAX_VALUE 1000000000
+#define MAX_VALUE 60000
 #define NEGATIVE_NUMBER -1
 #define NUMBER_TOO_BIG -2
 #define POLLING_INTERVAL 500000
@@ -46,3 +46,9 @@ int read_polling(int fd);
     * @param time_to_sleep es el tiempo que se duerme el proceso.
     */
 int read_sleep(int fd, int time_to_sleep);
+
+/**
+    * @brief El proceso intenta leer el driver y si el timer no esta listo, se duerme esperando una interrupcion.
+    * @param fd Es un identificador del file descriptor que se usa para comunicarse con el driver.
+    */
+int read_interrupcion(int fd);
