@@ -32,7 +32,7 @@ static int device_release(struct inode *, struct file *);
 static ssize_t device_read(struct file *, char *, size_t, loff_t *);
 static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 static void my_timer_startup(long timer_value);
-
+static void my_timer_callback( unsigned long data );
 
 static struct timer_list my_timer;
 static struct class*  myCharClass  = NULL;
@@ -179,8 +179,8 @@ static ssize_t device_read(struct file *filp,
 
 	printk("device read! timer done -> %d\n", timer_done);
 	if(timer_done == 1){
-		char done[] = "Timer ready!";
-		error_count = copy_to_user(buffer, done, length);
+		char done[13] = "Timer ready!";
+		error_count = copy_to_user(buffer, done, 13);
 		return error_count;	
 	}
 	else{

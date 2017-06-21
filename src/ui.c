@@ -102,7 +102,7 @@ int read_polling(int fd){
 		usleep(POLLING_INTERVAL);
 	}
 
-	printf("Timer finalizado, mensaje recibido: %s", recieve);
+	printf("Timer finalizado, mensaje recibido: %s\n", recieve);
 	return 0;
 }
 
