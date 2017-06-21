@@ -170,7 +170,6 @@ static ssize_t device_read(struct file *filp,
 	int error_count = 0;
    	// copy_to_user has the format ( * to, *from, size) and returns 0 on success
 
-	printk("INTERRUPT MODE IN READ %d\n", interrupt_mode);
 	if(interrupt_mode){
 	   	printk(KERN_DEBUG "process %i (%s) going to sleep\n", current->pid, current->comm);
 		wait_event_interruptible(wq, timer_done != 0);
@@ -218,7 +217,6 @@ static ssize_t device_write(struct file *filp, const char *buff, size_t len, lof
 		first_operation = 1;
 
 		mode = simple_strtol(msg, &temp , 10);
-		printk("mode %lu\n", mode);
 		if(mode == 3){
 			interrupt_mode = 1;
 			printk("Interrupt mode activated\n");
@@ -230,8 +228,6 @@ static ssize_t device_write(struct file *filp, const char *buff, size_t len, lof
 
 		return 0;
 	}
-
-	printk("%d\n", interrupt_mode);
 
 	msg_Ptr = msg;
 	printk(KERN_ALERT "Mensaje recibido -> %s", msg);

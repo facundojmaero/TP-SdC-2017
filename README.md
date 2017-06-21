@@ -291,6 +291,9 @@ Se incorporaron 3 modalidades:
  
  - **Interrupción:** El proceso lee el driver, se bloquea y espera ser despertado cuando el timer finalice.
  
+ ![ui sleep](/screens/ui_interrupcion.png?raw=true)
+ ![dmesg sleep](/screens/dmesg_interrupcion.png?raw=true) 
+
  En los primeros dos escenarios el proceso duerme utilizando la función `usleep()`, que acepta valores en microsegundos, por lo que las constantes definidas se encuentran en esta unidad.
  Una vez seleccionado esto, se solicita el tiempo para configurar el timer. Se aceptan valores positivos, pudiendo configurar un valor máximo `MAX_VALUE`.
 

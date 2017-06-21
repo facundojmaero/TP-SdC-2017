@@ -118,7 +118,7 @@ int read_sleep(int fd, int time_to_sleep){
 		return errno;
 	}
 
-	printf("Timer finalizado, mensaje recibido: %s", recieve);
+	printf("Timer finalizado, mensaje recibido: %s\n", recieve);
 	return 0;	
 }
 
@@ -132,7 +132,7 @@ int read_interrupcion(int fd){
 		return errno;
 	}
 
-	printf("Timer finalizado, mensaje recibido: %s", recieve);
+	printf("Timer finalizado, mensaje recibido: %s\n", recieve);
 	return 0;	
 }
 
