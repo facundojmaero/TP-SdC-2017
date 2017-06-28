@@ -269,6 +269,27 @@ wake_up_interruptible(&wq);
 
 Así, el proceso bloqueado en la mitad de la ejecución de una función del driver continuará directamente donde fue bloqueado sin ningún problema.
 
+#### Interrupciones por Teclado
+
+Se implementó la funcionalidad que combina el uso de la API de Interrupciones de Linux. Para ello, si quiere retornar de la llamada al driver habiendo seleccionado la opción por interrupciones, es necesario que el tiempo ingresado finalice, y que se presione una tecla del teclado.
+Solo cuando estas dos condiciones se cumplan el proceso continuará su ejecución.
+
+Para ello se creó un irq_handler que verifica el cumplimiento de estas condiciones. En caso positivo, despierta los procesos dormidos. El handler se llama cada vez que se presiona una tecla del teclado.
+
+Además se incluye el mismo chequeo en la rutina de callback del timer, de modo que si se presiona una tecla antes que pase el tiempo ingresado, también se despierten los procesos.
+
+Se investigó el siguiente link, donde se aclara que el IRQ Number para el teclado es el 1: https://en.wikipedia.org/wiki/Interrupt_request_(PC_architecture)
+
+Se realizó el request del IRQ 1, usando el flag IRQF_SHARED, para indicar el uso compartido de la línea IRQ. Es importante que el último parámetro de la llamada no sea **NULL**, sino un identificador único del driver.
+
+```
+int request_irq(unsigned int irq,
+irqreturn_t (*handler)(int, void *, struct pt_regs *),
+unsigned long flags, const char *dev_name,
+void *dev_id);
+```
+
+
 ### Desarrollo de la Interfaz de Usuario
 El programa que actúa como User Interface consiste en un código en C que solicita un valor a pasarle al driver, lo controla, y muestra por consola los resultados arrojados.
 
@@ -289,7 +310,7 @@ Se incorporaron 3 modalidades:
  ![ui sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/ui_sleep.png?raw=true)
  ![dmesg sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/dmesg_sleep.png?raw=true)
  
- - **Interrupción:** El proceso lee el driver, se bloquea y espera ser despertado cuando el timer finalice.
+ - **Interrupción:** El proceso lee el driver, se bloquea y espera ser despertado cuando el timer finalice. Hasta que no se presione una tecla cualquiera el proceso seguirá dormido, ya que se combinan la interrupción por timer y por teclado.
  
  ![ui sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/ui_interrupcion.png?raw=true)
  ![dmesg sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/dmesg_interrupcion.png?raw=true) 
@@ -334,5 +355,4 @@ Al compilar y linkear, se genera un archivo donde se guardan los posibles errore
 TP-ScC-2017/src/err.txt
 ```
 Si desea más información, remítase a la documentación proporcionada, que se encuentra en la ruta ```doc/html/index.html```
-
 
