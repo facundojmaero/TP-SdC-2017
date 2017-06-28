@@ -20,6 +20,7 @@
 #include <linux/cdev.h>
 #include <linux/string.h>
 #include <linux/wait.h>
+#include <linux/interrupt.h>
 
 #define DEVICE_NAME "my_timer1"			//El dispositivo aparecera en /dev/my_timer1
 #define CLASS_NAME  "my_timer_class"
@@ -52,9 +53,32 @@ static int major, timer_done, first_operation, interrupt_mode;
 static char msg[MSG_LEN];
 static char *msg_Ptr;
 static dev_t my_dev_t;
+static int bandera_teclado;
 
 //wait queue para alojar procesos bloqueados
 static DECLARE_WAIT_QUEUE_HEAD(wq);
+
+ /** @brief Interrupt handler por teclado
+     *
+     * Es llamada cuando se presiona una tecla.
+     * Si la bandera esta alta, se registra el toque, y si es momento de despertar 
+     * a los procesos dormidos, se los llama.
+     * (Cuando haya terminado el timer, y se presione una tecla)
+     */
+static irqreturn_t int_func(int irq, void *dev)
+{
+	if(bandera_teclado == -1){
+		return IRQ_HANDLED;	
+	}
+
+	// printk(KERN_INFO "Interrupcion por teclado detectada, flag = %d\n", bandera_teclado);
+	if(interrupt_mode && bandera_teclado){
+		printk(KERN_DEBUG "El proceso %i (%s) esta despertando los lectores...\n",	current->pid, current->comm);
+		wake_up_interruptible(&wq);
+	}
+	bandera_teclado++;
+	return IRQ_HANDLED;
+}
 
  /** @brief Funcion de inicializacion del modulo.
      *
@@ -69,6 +93,7 @@ static int __init initialization_function(void)
   //obtengo major y minor para el driver
 	int result;
 
+	bandera_teclado = -1;
 	my_cdev = cdev_alloc();
 	my_cdev->ops = &my_fops;
 	my_cdev->owner = THIS_MODULE;
@@ -110,6 +135,12 @@ static int __init initialization_function(void)
 
 	printk(KERN_INFO "my_timer1: driver inicializado correctamente\n");
 
+	result = request_irq(1, (irq_handler_t) int_func, IRQF_SHARED, "my_timer1", (void *)(int_func));
+	if (result==0)
+		printk(KERN_INFO "my interrupt module is initialized \n");
+	else
+		printk(KERN_INFO "my interrupt module's initialization failed | error_code=%i\n", result);
+
 	return 0;
 }
 module_init(initialization_function);
@@ -135,6 +166,9 @@ static void __exit cleanup_function(void)
 	class_destroy(myCharClass);
 
 	printk(KERN_INFO "my_timer1: modulo removido.\n");
+	// free_irq(1, NULL);
+	free_irq(1, (void *)(int_func));
+	printk(KERN_INFO "my interrupt module is distroyed \n");
 
 	return;
 }
@@ -144,12 +178,14 @@ module_exit(cleanup_function);
 static int device_open(struct inode *inode, struct file *file)
 {
 	first_operation = 0;
+	bandera_teclado = -1;
 	return 0;
 }
 
 static int device_release(struct inode *inode, struct file *file)
 {
 	first_operation = 0;
+	bandera_teclado = -1;
 	return 0;
 }
 
@@ -172,12 +208,13 @@ static ssize_t device_read(struct file *filp,
    	// copy_to_user has the format ( * to, *from, size) and returns 0 on success
 
 	if(interrupt_mode){
-	   	printk(KERN_DEBUG "process %i (%s) going to sleep\n", current->pid, current->comm);
+		bandera_teclado = 0;
+		printk(KERN_DEBUG "Proceso %i (%s) yendo a dormir\n", current->pid, current->comm);
 		wait_event_interruptible(wq, timer_done != 0);
 		printk(KERN_DEBUG "awoken %i (%s)\n", current->pid, current->comm);
 	}
 
-	printk("device read! timer done -> %d\n", timer_done);
+	printk("Device leido! Timer done -> %d\n", timer_done);
 	if(timer_done == 1){
 		char done[13] = "Timer ready!";
 		error_count = copy_to_user(buffer, done, 13);
@@ -250,10 +287,11 @@ void my_timer_callback( unsigned long data )
 	printk( "my_timer_callback called (%ld).\n", jiffies );
 	timer_done = 1;
 	
-	if(interrupt_mode){
-		printk(KERN_DEBUG "process %i (%s) awakening the readers...\n",	current->pid, current->comm);
+	if(interrupt_mode && bandera_teclado > 1){
+		printk(KERN_DEBUG "process %i (%s) awakening the readers from timer callback, %d...\n",	current->pid, current->comm, bandera_teclado);
 		wake_up_interruptible(&wq);
 	}
+	// asm ("int $50");
 }
 
  /** @brief Se pasa el valor que se desea que cuente el timer.

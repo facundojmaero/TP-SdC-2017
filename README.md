@@ -313,7 +313,7 @@ Se incorporaron 3 modalidades:
  - **Interrupción:** El proceso lee el driver, se bloquea y espera ser despertado cuando el timer finalice. Hasta que no se presione una tecla cualquiera el proceso seguirá dormido, ya que se combinan la interrupción por timer y por teclado.
  
  ![ui sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/ui_interrupcion.png?raw=true)
- ![dmesg sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/dmesg_interrupcion.png?raw=true) 
+ ![dmesg sleep](https://github.com/facundojmaero/TP-SdC-2017/blob/master/screens/dmesg_interrupcion2.png?raw=true) 
 
  En los primeros dos escenarios el proceso duerme utilizando la función `usleep()`, que acepta valores en microsegundos, por lo que las constantes definidas se encuentran en esta unidad.
  Una vez seleccionado esto, se solicita el tiempo para configurar el timer. Se aceptan valores positivos, pudiendo configurar un valor máximo `MAX_VALUE`.
@@ -355,4 +355,5 @@ Al compilar y linkear, se genera un archivo donde se guardan los posibles errore
 TP-ScC-2017/src/err.txt
 ```
 Si desea más información, remítase a la documentación proporcionada, que se encuentra en la ruta ```doc/html/index.html```
+
 
