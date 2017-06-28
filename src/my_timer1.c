@@ -72,7 +72,7 @@ static irqreturn_t int_func(int irq, void *dev)
 	}
 
 	// printk(KERN_INFO "Interrupcion por teclado detectada, flag = %d\n", bandera_teclado);
-	if(interrupt_mode && bandera_teclado){
+	if(interrupt_mode && bandera_teclado && timer_done){
 		printk(KERN_DEBUG "El proceso %i (%s) esta despertando los lectores...\n",	current->pid, current->comm);
 		wake_up_interruptible(&wq);
 	}
